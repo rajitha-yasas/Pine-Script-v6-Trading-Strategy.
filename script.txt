@@ -1,0 +1,62 @@
+//@version=6
+strategy("AI-Optimized Trading Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=2)
+
+// === Parameters ===
+atrLength = input.int(14, title="ATR Length")
+supertrendLength = input.int(10, title="Supertrend Length")  // Must be an integer
+supertrendFactor = input.int(3, title="Supertrend Factor")  // Must be an integer
+rsiLength = input.int(14, title="RSI Length")
+macdFastLength = input.int(12, title="MACD Fast Length")
+macdSlowLength = input.int(26, title="MACD Slow Length")
+macdSignalLength = input.int(9, title="MACD Signal Length")
+adxLength = input.int(14, title="ADX Length")
+adxSmoothing = input.int(14, title="ADX Smoothing")  // Required parameter for ta.dmi()
+
+// === Indicators ===
+// ATR for volatility filtering
+atr = ta.atr(atrLength)
+
+// Supertrend Calculation (Both arguments are integers)
+[superTrend, superTrendDirection] = ta.supertrend(supertrendLength, supertrendFactor)
+
+// RSI Calculation
+rsi = ta.rsi(close, rsiLength)
+
+// MACD Calculation
+[macdLine, signalLine, _] = ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength)
+
+// ADX Calculation
+[dmiPlus, dmiMinus, adx] = ta.dmi(adxLength, adxSmoothing)
+
+// === Trading Conditions ===
+// Buy Condition
+buyCondition = ta.crossover(macdLine, signalLine) and rsi > 50 and close > superTrend and adx > 20
+
+// Sell Condition
+sellCondition = ta.crossunder(macdLine, signalLine) and rsi < 50 and close < superTrend and adx > 20
+
+// Stop-Loss & Take-Profit
+slMultiplier = input.float(1.5, title="ATR Stop Loss Multiplier")
+tpMultiplier = input.float(3.0, title="ATR Take Profit Multiplier")
+
+longStopLoss = close - (atr * slMultiplier)
+longTakeProfit = close + (atr * tpMultiplier)
+
+shortStopLoss = close + (atr * slMultiplier)
+shortTakeProfit = close - (atr * tpMultiplier)
+
+// === Execute Trades ===
+if buyCondition
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long TP/SL", from_entry="Long", stop=longStopLoss, limit=longTakeProfit)
+
+if sellCondition
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short TP/SL", from_entry="Short", stop=shortStopLoss, limit=shortTakeProfit)
+
+// === Visuals ===
+supertrendColor = superTrendDirection == 1 ? color.green : color.red
+plot(superTrend, color=supertrendColor, title="Supertrend")
+plot(macdLine, color=color.blue, title="MACD Line")
+plot(signalLine, color=color.orange, title="Signal Line")
+hline(50, "RSI Midline", color=color.gray)
